@@ -58,7 +58,9 @@ switch ($return_num_replies) {
     break;
 }
 }
+
 else{
+
 
 $apiaiurl = "https://api.api.ai/v1/query?v=20150910";   
 
