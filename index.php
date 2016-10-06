@@ -6,10 +6,11 @@ $db=mysqli_connect("localhost","root","","chatbot") or die("Can not connect righ
 //$url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
 
 
-$access_token = "EAAIpDWRp6RMBAHk8PKIbBuPocsbNmrszj6VrB1IDdse6JcaPvo9XZBqCP6jpz0C6Op72MmhrjxejeXDhLuVeyZAbIZBzNRQX9s2XEGIrfHWq1W7HXOLBqZCHa7tsHr1rKYJNiPMbC2iBvSr16wWG3ODF54lCLZBvWpZAErHqOnZBQZDZD";
+$access_token = "EAASK50x8ys8BALVU7K6HTevDYuwm6ZAazZCHlkiIC0JBjv8sAI6P7vGQRGjebLBZAr5oEszkp00ebtgkwzawG1hbOPr8EXS8aDOwDTc0iqDZCTTiMmcKhtFVmHqXv0NDNuJE5WRz49ZBqEXaZBTQLdlYFdkR0hT678BUaadcg5GAZDZD";
 
 $url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
 
+$flag=0;
 
 $verify_token = "php_chat_bot";
 $hub_verify_token = null;
@@ -33,31 +34,33 @@ $sender = $input['entry'][0]['messaging'][0]['sender']['id'];
 
 $message = $input['entry'][0]['messaging'][0]['message']['text'];
 
+//echo "sizeof message". $message. "end of message";
+
+if($sender != 217358738681243 && isset($message)){
+
 $return_num_replies = checkfirsttime($sender);
 
-echo "replies = ".$return_num_replies;
+//echo "replies = ".$return_num_replies."\n";
+
+if($return_num_replies <=3){
 
 switch ($return_num_replies) {
     case '1':
         firsttime($sender,$url);
         break;
     case '2':
+
         secondtime($sender,$url,$message);
         break;
     case '3':
         thirdtime($sender,$url,$message);
         break;
-    case '4':
-        //fourthtime($sender,$url,$message);
-        break;
-    default:
-        # code...
-        break;
+    break;
 }
+}
+else{
 
-
-
-/*$apiaiurl = "https://api.api.ai/v1/query?v=20150910";   
+$apiaiurl = "https://api.api.ai/v1/query?v=20150910";   
 
 $ch1 = curl_init($apiaiurl);
 
@@ -88,8 +91,11 @@ else{
     $message_to_reply = "Sorry, I didnt understand that.";
 }
 
+
+save_message_and_response_api($sender,$message,$message_to_reply);
+
 //echo sizeof($message_to_reply);
-echo $message_to_reply;
+//echo $message_to_reply;
 //print $message_to_reply;
 
 $url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
@@ -120,12 +126,18 @@ if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
     curl_exec($ch);
     curl_close($ch);
 }
-*/
 
+}
+}
 
 function firsttime($sender,$url){
 
-    $messages= "First time message";
+    $db = $GLOBALS['db'];
+    $num = 1;
+    $sql = "INSERT INTO `clients`(`id`,`replies`) VALUES ('$sender', '$num')";
+    $result = mysqli_query($db,$sql);
+
+    $messages= "Hello User. We welcome you to Chat_bot. Please help us know you better. Please enter Following Details \\n1. Name \\n2. Interests";
         echo $sender;
         $temp = $messages;
 
@@ -158,13 +170,13 @@ function firsttime($sender,$url){
 
 function secondtime($sender,$url,$message){
     $db = $GLOBALS['db'];
-    $num = 1;
-    $sql = "INSERT INTO `clients`(`id`,`replies`) VALUES ('$sender', '$num')";
+    $num = 2;
+    $sql = "UPDATE `clients` SET `replies`='$num' WHERE `id` = '$sender'";
     $result = mysqli_query($db,$sql);
     $sql1 = "INSERT INTO `user_record`(`id`,`name`) VALUES ('$sender', '$message')";
     $result1 = mysqli_query($db,$sql1);
 
-    $send_message = "Second Message";
+    $send_message = "Please Give your comma separated Interests";
 
     $ch = curl_init($url);
        $jsonData = '{
@@ -196,13 +208,13 @@ function secondtime($sender,$url,$message){
 
 function thirdtime($sender,$url,$message){
     $db = $GLOBALS['db'];
-    $num = 2;
+    $num = 3;
     $sql = "UPDATE `clients` SET `replies`='$num' WHERE `id` = '$sender'";
     $result = mysqli_query($db,$sql);
     $sql1 = "UPDATE `user_record` SET `interests`= '$message' WHERE `id` = '$sender'";
     $result1 = mysqli_query($db,$sql1);
 
-    $send_message = "Third Message";
+    $send_message = "Thank You for ur Response \\n I can help u with many things like \\n1.News \\n2.Scheduling \\n 3.OCR \\n4. Image/gif search";
 
     $ch = curl_init($url);
        $jsonData = '{
@@ -242,8 +254,10 @@ function checkfirsttime($sender){
     $num_query = mysqli_num_rows($result);
     if($num_query == 0) return 1;
     else {
+        echo $num_query;
         $row = mysqli_fetch_row($result);
-        $num_replies = $row['replies'];
+        echo "size = ".sizeof($row);
+        $num_replies = $row[1];
         switch ($num_replies) {
             case '1':
                     return 2;
@@ -260,5 +274,10 @@ function checkfirsttime($sender){
     }
 }
 
+function save_message_and_response_api($sender,$message,$message_to_reply){
+        $db = $GLOBALS['db'];
+        $sql = "INSERT INTO `chat_history`(`id`, `user_message`, `reply`) VALUES  ('$sender','$message','$message_to_reply')";
+        $result = mysqli_query($db,$sql);
+}
 
 ?>
