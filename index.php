@@ -25,7 +25,10 @@ if ($hub_verify_token === $verify_token) {
     echo $challenge;
 }
 
-//echo "Hello";
+
+checkupdatestatus($url);
+
+
 
 //$input = json_decode($variable, true, 512, JSON_BIGINT_AS_STRING);
 $input = json_decode(file_get_contents('php://input'), true);
@@ -262,9 +265,9 @@ function checkfirsttime($sender){
     $num_query = mysqli_num_rows($result);
     if($num_query == 0) return 1;
     else {
-        echo $num_query;
+        //echo $num_query;
         $row = mysqli_fetch_row($result);
-        echo "size = ".sizeof($row);
+        //echo "size = ".sizeof($row);
         $num_replies = $row[1];
         switch ($num_replies) {
             case '1':
@@ -297,7 +300,7 @@ function checkschedule($message){
         if(isset($matches[0])){
         $string = $matches[0];
         $maintag = substr($string, 1);
-        echo $maintag;
+        //echo $maintag;
         if( strcasecmp($maintag,"schedule")==0){
             return true;
         }
@@ -319,15 +322,98 @@ function add_schedule_db($sender, $message){
     $string = $matches[0];
 
     $temp = strrpos($string,"on");
-    $date = substr($string, ($temp+2));
+    $date = substr($string, ($temp+3));
     $title = substr($string, 1, ($temp-2));
-    echo $date;
-    echo $title;
+   // echo $date;
+
+   // echo $title;
     $sql = "INSERT INTO `scheduler`(`id`,`title`,`date`) VALUES ('$sender','$title','$date') ";
     $result = mysqli_query($db,$sql);
 }
 }
 
+function checkupdatestatus($url){
+    $db = $GLOBALS['db'];
+
+    $time = date("h");
+    if($time >= 9){
+        $date = date("Y-m-d");
+
+        $sql = "SELECT `id`, `interests` FROM  `user_record` WHERE `updated` = 'N'";
+        $result = mysqli_query($db,$sql);
+        $num_query = mysqli_num_rows($result);
+        echo  $num_query;
+        //start of new func
+        for($i=0;$i<$num_query;$i++){
+
+$row=mysqli_fetch_array($result);
+    $ch = curl_init($url);
+    $tmp1 = $row[0];
+    $tmp2 = $row[1];
+    $jsonData = '{
+            "recipient":{
+                "id":"'."$tmp1".'"
+            },
+            "message":{
+                "text":"'."$tmp2".'"
+            }
+        }';
+
+//Encode the array into JSON.
+    $jsonDataEncoded = $jsonData;
+//Tell cURL that we want to send a POST request.
+    curl_setopt($ch, CURLOPT_POST, 1);
+//Attach our encoded JSON string to the POST fields.
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+//Set the content type to application/json
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+//Execute the request
+    if(!empty($jsonData)){
+        curl_exec($ch);
+        curl_close($ch);
+    }
+}
+        //end of new func
+        //echo $date;
+         $sql1 = "SELECT `id`, `title` FROM  `scheduler` WHERE `date` = '$date' AND `updated` = 'N'";
+         $result1 = mysqli_query($db,$sql1);
+         $num_query =  mysqli_num_rows($result1);
+         echo "number 2 = ".$num_query;
+for($i=0;$i<$num_query;$i++){
+
+$row=mysqli_fetch_array($result1);
+    $ch = curl_init($url);
+     $tmp1 = $row[0];
+    $tmp2 = $row[1];
+    $jsonData = '{
+            "recipient":{
+                "id":"'."$tmp1".'"
+            },
+            "message":{
+                "text":"'."$tmp2".'"
+            }
+        }';
+
+//Encode the array into JSON.
+    $jsonDataEncoded = $jsonData;
+//Tell cURL that we want to send a POST request.
+    curl_setopt($ch, CURLOPT_POST, 1);
+//Attach our encoded JSON string to the POST fields.
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+//Set the content type to application/json
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+//Execute the request
+    if(!empty($jsonData)){
+        curl_exec($ch);
+        curl_close($ch);
+    }
+}
+
+    }
+
+}
 
 
 ?>
