@@ -26,16 +26,18 @@ if ($hub_verify_token === $verify_token) {
 }
 
 
-checkupdatestatus($url);
-
-
-
 //$input = json_decode($variable, true, 512, JSON_BIGINT_AS_STRING);
 $input = json_decode(file_get_contents('php://input'), true);
 //echo sizeof($input);
 $sender = $input['entry'][0]['messaging'][0]['sender']['id'];
 
 $message = $input['entry'][0]['messaging'][0]['message']['text'];
+
+if(checkschedule($message)){
+        add_schedule_db($sender, $message,$url);
+        $flag =1;
+    }
+checkupdatestatus($url);
 
 //echo "sizeof message". $message. "end of message";
 
@@ -62,13 +64,7 @@ if($sender != 217358738681243 && isset($message)){
         }
     }
 
-
-    else if(checkschedule($message)){
-        add_schedule_db($sender, $message);
-    }
-
-
-    else{
+    else if ($flag!=1){
 
 
         $apiaiurl = "https://api.api.ai/v1/query?v=20150910";   
@@ -314,7 +310,7 @@ function checkschedule($message){
     }
 }
 
-function add_schedule_db($sender, $message){
+function add_schedule_db($sender, $message,$url){
     $db = $GLOBALS['db'];
     $pattern = "/\B#[^\B]+/";
     preg_match($pattern, $message, $matches);
@@ -325,94 +321,145 @@ function add_schedule_db($sender, $message){
     $date = substr($string, ($temp+3));
     $title = substr($string, 1, ($temp-2));
    // echo $date;
-
+    $date_curr = date("Y-m-d");
+    if($date > $date_curr){
    // echo $title;
     $sql = "INSERT INTO `scheduler`(`id`,`title`,`date`) VALUES ('$sender','$title','$date') ";
     $result = mysqli_query($db,$sql);
+
+    $sql_update_meta_data1 = "UPDATE `status_table_metadata` SET `updated_on` = '$date_curr' AND `is_updated`= 'N'";
+    mysqli_query($db,$sql_update_meta_data1);
+
+    }
+    else {
+         $ch = curl_init($url);
+            $error_message = "The date is not in correct. Please enter valid future date in correct format";
+                $jsonData = '{
+                    "recipient":{
+                        "id":"'."$sender".'"
+                    },
+                    "message":{
+                        "text":"'."$error_message".'"
+                    }
+                }';
+
+//Encode the array into JSON.
+                $jsonDataEncoded = $jsonData;
+//Tell cURL that we want to send a POST request.
+                curl_setopt($ch, CURLOPT_POST, 1);
+//Attach our encoded JSON string to the POST fields.
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+//Set the content type to application/json
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+//Execute the request
+                if(!empty($jsonData)){
+                    curl_exec($ch);
+                    curl_close($ch);
+                }
+    }
+   
 }
 }
 
 function checkupdatestatus($url){
     $db = $GLOBALS['db'];
+    //$date = date("Y-m-d");
+    $date = date("Y-m-d");
+    $sql = "SELECT `updated_on`, `is_updated` FROM  `status_table_metadata`";
+    $result_meta_data = mysqli_query($db,$sql);
+    echo mysqli_num_rows($result_meta_data);
+    $row_meta_data = mysqli_fetch_row($result_meta_data); 
+    if(!(($row_meta_data[0] == $date) && ($row_meta_data[1] == "Y"))){
+        $time = 12;
+        if($time >= 9){
 
-    $time = date("h");
-    if($time >= 9){
-        $date = date("Y-m-d");
-
-        $sql = "SELECT `id`, `interests` FROM  `user_record` WHERE `updated` = 'N'";
-        $result = mysqli_query($db,$sql);
-        $num_query = mysqli_num_rows($result);
-        echo  $num_query;
+            $sql = "SELECT `id`, `interests` FROM  `user_record` WHERE `updated` = 'N'";
+            $result = mysqli_query($db,$sql);
+            $num_query = mysqli_num_rows($result);
+            echo  $num_query;
         //start of new func
-        for($i=0;$i<$num_query;$i++){
+            for($i=0;$i<$num_query;$i++){
 
-$row=mysqli_fetch_array($result);
-    $ch = curl_init($url);
-    $tmp1 = $row[0];
-    $tmp2 = $row[1];
-    $jsonData = '{
-            "recipient":{
-                "id":"'."$tmp1".'"
-            },
-            "message":{
-                "text":"'."$tmp2".'"
-            }
-        }';
+                $row=mysqli_fetch_row($result);
+                $ch = curl_init($url);
+                $tmp1 = $row[0];
+                $tmp2 = $row[1];
+                $jsonData = '{
+                    "recipient":{
+                        "id":"'."$tmp1".'"
+                    },
+                    "message":{
+                        "text":"'."$tmp2".'"
+                    }
+                }';
 
 //Encode the array into JSON.
-    $jsonDataEncoded = $jsonData;
+                $jsonDataEncoded = $jsonData;
 //Tell cURL that we want to send a POST request.
-    curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POST, 1);
 //Attach our encoded JSON string to the POST fields.
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
 //Set the content type to application/json
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
 //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
 //Execute the request
-    if(!empty($jsonData)){
-        curl_exec($ch);
-        curl_close($ch);
-    }
-}
+                if(!empty($jsonData)){
+                    curl_exec($ch);
+                    curl_close($ch);
+                }
+            }
+
+            $sql_update_status = "UPDATE `user_record` SET `updated` = 'Y'";
+            mysqli_query($db,$sql_update_status);
+
         //end of new func
-        //echo $date;
-         $sql1 = "SELECT `id`, `title` FROM  `scheduler` WHERE `date` = '$date' AND `updated` = 'N'";
-         $result1 = mysqli_query($db,$sql1);
-         $num_query =  mysqli_num_rows($result1);
-         echo "number 2 = ".$num_query;
-for($i=0;$i<$num_query;$i++){
+        echo $date;
+            $sql1 = "SELECT `id`, `title` FROM `scheduler` WHERE `date` = '$date' AND `updated` = 'N'";
+            $result1 = mysqli_query($db,$sql1);
+            $num_query =  mysqli_num_rows($result1);
+            echo "number 2 = ".$num_query;
+            for($i=0;$i<$num_query;$i++){
 
-$row=mysqli_fetch_array($result1);
-    $ch = curl_init($url);
-     $tmp1 = $row[0];
-    $tmp2 = $row[1];
-    $jsonData = '{
-            "recipient":{
-                "id":"'."$tmp1".'"
-            },
-            "message":{
-                "text":"'."$tmp2".'"
-            }
-        }';
+                $row=mysqli_fetch_row($result1);
+                $ch = curl_init($url);
+                $tmp1 = $row[0];
+                $tmp2 = $row[1]." today";
+                $jsonData = '{
+                    "recipient":{
+                        "id":"'."$tmp1".'"
+                    },
+                    "message":{
+                        "text":"'."$tmp2".'"
+                    }
+                }';
 
 //Encode the array into JSON.
-    $jsonDataEncoded = $jsonData;
+                $jsonDataEncoded = $jsonData;
 //Tell cURL that we want to send a POST request.
-    curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POST, 1);
 //Attach our encoded JSON string to the POST fields.
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
 //Set the content type to application/json
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
 //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
 //Execute the request
-    if(!empty($jsonData)){
-        curl_exec($ch);
-        curl_close($ch);
-    }
-}
+                if(!empty($jsonData)){
+                    curl_exec($ch);
+                    curl_close($ch);
+                }
+            }
 
-    }
 
+            $sql_update_status1 = "UPDATE `scheduler` SET `updated` = 'Y' WHERE `date` <= '$date'";
+            mysqli_query($db,$sql_update_status1);
+
+            echo $date;
+            $sql_update_meta_data = "UPDATE `status_table_metadata` SET `updated_on` = '$date' AND `is_updated`= 'Y'";
+            mysqli_query($db,$sql_update_meta_data);
+
+        }
+    }
 }
 
 
