@@ -1,10 +1,7 @@
 <?php
 
-//start_session();
 
 $db=mysqli_connect("localhost","root","","chatbot") or die("Can not connect right now!");
-//$url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
-
 
 $access_token = "EAASK50x8ys8BALVU7K6HTevDYuwm6ZAazZCHlkiIC0JBjv8sAI6P7vGQRGjebLBZAr5oEszkp00ebtgkwzawG1hbOPr8EXS8aDOwDTc0iqDZCTTiMmcKhtFVmHqXv0NDNuJE5WRz49ZBqEXaZBTQLdlYFdkR0hT678BUaadcg5GAZDZD";
 
@@ -28,49 +25,73 @@ if ($hub_verify_token === $verify_token) {
 
 //$input = json_decode($variable, true, 512, JSON_BIGINT_AS_STRING);
 $input = json_decode(file_get_contents('php://input'), true);
-//echo sizeof($input);
+
 $sender = $input['entry'][0]['messaging'][0]['sender']['id'];
 
 $message = $input['entry'][0]['messaging'][0]['message']['text'];
 
-if(checkschedule($message)){
-        add_schedule_db($sender, $message,$url);
-        $flag =1;
-    }
-checkupdatestatus($url);
 
-//echo "sizeof message". $message. "end of message";
+//checkupdatestatus($url);
+
 
 if($sender != 217358738681243 && isset($message)){
 
     $return_num_replies = checkfirsttime($sender);
 
-//echo "replies = ".$return_num_replies."\n";
-
+	echo $return_num_replies."\n";
     if($return_num_replies <=3){
 
         switch ($return_num_replies) {
             case '1':
             firsttime($sender,$url);
+                            $flag = 1;
+
             break;
             case '2':
-
             secondtime($sender,$url,$message);
+                            $flag = 1;
+
             break;
             case '3':
             thirdtime($sender,$url,$message);
-            break;
+                            $flag = 1;
+
             break;
         }
     }
 
-    else if ($flag!=1){
+    else if (isMainTag($message)){
+	echo "inside tags\n";
+        $maintag = getMainTags($message);
 
+        switch ($maintag) {
+          case 'schedule':
+                add_schedule_db($sender, $message,$url);
+                $flag = 1;
+               break;
+        case 'places':
+                getPlaces($message,$url,$sender);
+                $flag = 1;
+               break;
+        case 'news':
+                getNews($message,$url,$sender);
+                $flag = 1;
+               break;
+        case 'weather':
+                getWeather($message,$url,$sender);
+                $flag = 1;
+               break;
+          break;
+        }
+
+    }
+    else{
 
         $apiaiurl = "https://api.api.ai/v1/query?v=20150910";   
 
         $ch1 = curl_init($apiaiurl);
-
+	echo "inside API Call\n";
+echo "message= ".$message;
         $jsonData1 = '{
             "query":[
             "'."$message".'"
@@ -83,27 +104,24 @@ if($sender != 217358738681243 && isset($message)){
         curl_setopt($ch1, CURLOPT_POST, 1);
         curl_setopt($ch1, CURLOPT_POSTFIELDS, $jsonDataEncoded1);
         curl_setopt($ch1, CURLOPT_HTTPHEADER, array('Authorization: Bearer 0f4915a28b964721860f3b7c5db16eea', 'Content-Type: application/json' ));
-//curl_setopt($ch1, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch1, CURLOPT_RETURNTRANSFER, 1);
 
         $airesult = curl_exec($ch1);
+	echo "sixe of airesult ".sizeof($airesult);
         curl_close($ch1);
 
         $response = json_decode($airesult, true);
 
+	echo "sixe of response ".sizeof($response);
         if(sizeof($response)){
             $message_to_reply = $response['result']['fulfillment']['speech'];
         }
         else{
+
             $message_to_reply = "Sorry, I didnt understand that.";
         }
 
-
         save_message_and_response_api($sender,$message,$message_to_reply);
-
-//echo sizeof($message_to_reply);
-//echo $message_to_reply;
-//print $message_to_reply;
 
         $url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
 
@@ -129,14 +147,12 @@ if($sender != 217358738681243 && isset($message)){
         curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
 //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
 //Execute the request
-        if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
+        if(!empty($jsonData)){
             curl_exec($ch);
             curl_close($ch);
         }
-
     }
 }
-
 function firsttime($sender,$url){
 
     $db = $GLOBALS['db'];
@@ -195,22 +211,14 @@ function secondtime($sender,$url,$message){
         }
     }';
 
-//Encode the array into JSON.
     $jsonDataEncoded = $jsonData;
-//Tell cURL that we want to send a POST request.
     curl_setopt($ch, CURLOPT_POST, 1);
-//Attach our encoded JSON string to the POST fields.
     curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-//Set the content type to application/json
     curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-//Execute the request
     if(!empty($jsonData)){
         curl_exec($ch);
         curl_close($ch);
     }
-
-
 }
 
 function thirdtime($sender,$url,$message){
@@ -233,25 +241,15 @@ function thirdtime($sender,$url,$message){
         }
     }';
 
-//Encode the array into JSON.
     $jsonDataEncoded = $jsonData;
-//Tell cURL that we want to send a POST request.
     curl_setopt($ch, CURLOPT_POST, 1);
-//Attach our encoded JSON string to the POST fields.
     curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-//Set the content type to application/json
     curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-//Execute the request
     if(!empty($jsonData)){
         curl_exec($ch);
         curl_close($ch);
     }
 }
-
-
-
-
 
 function checkfirsttime($sender){
     $db = $GLOBALS['db'];
@@ -261,9 +259,7 @@ function checkfirsttime($sender){
     $num_query = mysqli_num_rows($result);
     if($num_query == 0) return 1;
     else {
-        //echo $num_query;
         $row = mysqli_fetch_row($result);
-        //echo "size = ".sizeof($row);
         $num_replies = $row[1];
         switch ($num_replies) {
             case '1':
@@ -290,13 +286,12 @@ function save_message_and_response_api($sender,$message,$message_to_reply){
 
 function checkschedule($message){
 
-        $pattern = "/((?<!\S)@\w+(?!\S))/";
+    $pattern = "/((?<!\S)@\w+(?!\S))/";
 
-        preg_match($pattern, $message, $matches);
-        if(isset($matches[0])){
+    preg_match($pattern, $message, $matches);
+    if(isset($matches[0])){
         $string = $matches[0];
         $maintag = substr($string, 1);
-        //echo $maintag;
         if( strcasecmp($maintag,"schedule")==0){
             return true;
         }
@@ -315,56 +310,47 @@ function add_schedule_db($sender, $message,$url){
     $pattern = "/\B#[^\B]+/";
     preg_match($pattern, $message, $matches);
     if(isset($matches)){
-    $string = $matches[0];
+        $string = $matches[0];
 
-    $temp = strrpos($string,"on");
-    $date = substr($string, ($temp+3));
-    $title = substr($string, 1, ($temp-2));
-   // echo $date;
-    $date_curr = date("Y-m-d");
-    if($date > $date_curr){
-   // echo $title;
-    $sql = "INSERT INTO `scheduler`(`id`,`title`,`date`) VALUES ('$sender','$title','$date') ";
-    $result = mysqli_query($db,$sql);
+        $temp = strrpos($string,"on");
+        $date = substr($string, ($temp+3));
+        $title = substr($string, 1, ($temp-2));
+        $date_curr = date("Y-m-d");
+        if($date > $date_curr){
+            $sql = "INSERT INTO `scheduler`(`id`,`title`,`date`) VALUES ('$sender','$title','$date') ";
+            $result = mysqli_query($db,$sql);
+            echo "current date = ".$date_curr;
+            //$sql_update_meta_data1 = "UPDATE `status_table_metadata` SET `updated_on` = '".date("Y-m-d")."' AND `is_updated`= 'N' WHERE `serial`= '1'";
+            //echo mysqli_query($db,$sql_update_meta_data1);
 
-    $sql_update_meta_data1 = "UPDATE `status_table_metadata` SET `updated_on` = '$date_curr' AND `is_updated`= 'N'";
-    mysqli_query($db,$sql_update_meta_data1);
-
-    }
-    else {
+        }
+        else {
          $ch = curl_init($url);
-            $error_message = "The date is not in correct. Please enter valid future date in correct format";
-                $jsonData = '{
-                    "recipient":{
-                        "id":"'."$sender".'"
-                    },
-                    "message":{
-                        "text":"'."$error_message".'"
-                    }
-                }';
+         $error_message = "The date is not in correct. Please enter valid future date in correct format";
+         $jsonData = '{
+            "recipient":{
+                "id":"'."$sender".'"
+            },
+            "message":{
+                "text":"'."$error_message".'"
+            }
+        }';
 
-//Encode the array into JSON.
-                $jsonDataEncoded = $jsonData;
-//Tell cURL that we want to send a POST request.
-                curl_setopt($ch, CURLOPT_POST, 1);
-//Attach our encoded JSON string to the POST fields.
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-//Set the content type to application/json
-                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-//Execute the request
-                if(!empty($jsonData)){
-                    curl_exec($ch);
-                    curl_close($ch);
-                }
+        $jsonDataEncoded = $jsonData;
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        if(!empty($jsonData)){
+            curl_exec($ch);
+            curl_close($ch);
+        }
     }
-   
+
 }
 }
 
 function checkupdatestatus($url){
     $db = $GLOBALS['db'];
-    //$date = date("Y-m-d");
     $date = date("Y-m-d");
     $sql = "SELECT `updated_on`, `is_updated` FROM  `status_table_metadata`";
     $result_meta_data = mysqli_query($db,$sql);
@@ -372,13 +358,14 @@ function checkupdatestatus($url){
     $row_meta_data = mysqli_fetch_row($result_meta_data); 
     if(!(($row_meta_data[0] == $date) && ($row_meta_data[1] == "Y"))){
         $time = 12;
+
         if($time >= 9){
 
             $sql = "SELECT `id`, `interests` FROM  `user_record` WHERE `updated` = 'N'";
             $result = mysqli_query($db,$sql);
             $num_query = mysqli_num_rows($result);
             echo  $num_query;
-        //start of new func
+
             for($i=0;$i<$num_query;$i++){
 
                 $row=mysqli_fetch_row($result);
@@ -394,16 +381,10 @@ function checkupdatestatus($url){
                     }
                 }';
 
-//Encode the array into JSON.
                 $jsonDataEncoded = $jsonData;
-//Tell cURL that we want to send a POST request.
                 curl_setopt($ch, CURLOPT_POST, 1);
-//Attach our encoded JSON string to the POST fields.
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-//Set the content type to application/json
                 curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-//Execute the request
                 if(!empty($jsonData)){
                     curl_exec($ch);
                     curl_close($ch);
@@ -413,7 +394,6 @@ function checkupdatestatus($url){
             $sql_update_status = "UPDATE `user_record` SET `updated` = 'Y'";
             mysqli_query($db,$sql_update_status);
 
-        //end of new func
         echo $date;
             $sql1 = "SELECT `id`, `title` FROM `scheduler` WHERE `date` = '$date' AND `updated` = 'N'";
             $result1 = mysqli_query($db,$sql1);
@@ -434,16 +414,10 @@ function checkupdatestatus($url){
                     }
                 }';
 
-//Encode the array into JSON.
                 $jsonDataEncoded = $jsonData;
-//Tell cURL that we want to send a POST request.
                 curl_setopt($ch, CURLOPT_POST, 1);
-//Attach our encoded JSON string to the POST fields.
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-//Set the content type to application/json
                 curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-//Execute the request
                 if(!empty($jsonData)){
                     curl_exec($ch);
                     curl_close($ch);
@@ -454,13 +428,321 @@ function checkupdatestatus($url){
             $sql_update_status1 = "UPDATE `scheduler` SET `updated` = 'Y' WHERE `date` <= '$date'";
             mysqli_query($db,$sql_update_status1);
 
-            echo $date;
-            $sql_update_meta_data = "UPDATE `status_table_metadata` SET `updated_on` = '$date' AND `is_updated`= 'Y'";
+            $date = date("Y-m-d");
+            $sql_update_meta_data = "UPDATE `status_table_metadata` SET `updated_on` = '$date' AND `is_updated`= 'Y' WHERE `serial` = '1'";
             mysqli_query($db,$sql_update_meta_data);
 
         }
     }
 }
 
+function getHashTags($string){
+    $pattern = "/\B#[^\B]+/";
+    preg_match($pattern, $string, $matches);
+    $returntag= substr($matches[0], 1);
+    return $returntag;
+}
+
+function getMainTags($string){
+    $pattern = "/((?<!\S)@\w+(?!\S))/";
+    preg_match($pattern, $string, $matches);
+    $returntag= substr($matches[0], 1);
+    return $returntag;
+}
+
+function isMaintag($string){
+ $pattern = "/((?<!\S)@\w+(?!\S))/";
+    preg_match($pattern, $string, $matches);
+if(isset($matches[0])){
+return true;
+}
+else {
+return false;
+}
+}
+function getNews($message,$url,$sender)
+    {
+        //news api - a3f365280e404a49b0595f6c1d8cec05
+        $hashtag = getHashTags($message);
+        $chnews = curl_init();
+        curl_setopt_array($chnews, array(
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_URL => "https://newsapi.org/v1/articles?source=".$hashtag."&apiKey=a3f365280e404a49b0595f6c1d8cec05"
+        ));
+        $resp = curl_exec($chnews);
+        curl_close($chnews);
+        $resp_news = json_decode($resp, true);
+        $news_length= sizeof($resp_news['articles']);
+        $array_of_news = [];
+        for($i = 0; $i < $news_length; $i++){
+            $news_title[$i] = $resp_news['articles'][$i]['title'];
+            $news_url[$i] = $resp_news['articles'][$i]['url'];
+            $news_image_url[$i] = $resp_news['articles'][$i]['urlToImage'];
+            $news_desc[$i] = $resp_news['articles'][$i]['description'];     
+        }
+        
+        //Initiate cURL.
+        $ch = curl_init($url);
+        //The JSON data.
+        $jsonData1 = '{
+            "recipient":{
+                "id":"'."$sender".'"
+            },
+            "message":{
+                "attachment" : {
+                    "type" : "template",
+                    "payload": {
+                        "template_type" : "generic",
+                        "elements" : [
+                            {
+                                "title" : "'."$news_title[0]".'",
+                                "item_url" : "'."$news_url[0]".'",
+                                "image_url" : "'."$news_image_url[0]".'",
+                                "subtitle" : "'."$news_desc[0]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$news_title[1]".'",
+                                "item_url" : "'."$news_url[1]".'",
+                                "image_url" : "'."$news_image_url[1]".'",
+                                "subtitle" : "'."$news_desc[1]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$news_title[2]".'",
+                                "item_url" : "'."$news_url[2]".'",
+                                "image_url" : "'."$news_image_url[2]".'",
+                                "subtitle" : "'."$news_desc[2]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$news_title[3]".'",
+                                "item_url" : "'."$news_url[3]".'",
+                                "image_url" : "'."$news_image_url[3]".'",
+                                "subtitle" : "'."$news_desc[3]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$news_title[4]".'",
+                                "item_url" : "'."$news_url[4]".'",
+                                "image_url" : "'."$news_image_url[4]".'",
+                                "subtitle" : "'."$news_desc[4]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }';
+
+        //Encode the array into JSON.
+        $jsonDataEncoded = $jsonData1;
+        //Tell cURL that we want to send a POST request.
+        curl_setopt($ch, CURLOPT_POST, 1);
+        //Attach our encoded JSON string to the POST fields.
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+        //Set the content type to application/json
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+        //Execute the request
+        //if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
+            curl_exec($ch);
+            curl_close($ch);
+        //}
+    
+    }
+
+function getWeather($message,$url,$sender){
+        //apikey = a3e33f871698f4ec
+    $hashtag = getHashTags($message);
+        $chweather = curl_init();
+        curl_setopt_array($chweather, array(
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_URL => "http://api.wunderground.com/api/a3e33f871698f4ec/geolookup/conditions/forecast/q/".$hashtag.".json"
+        ));
+        $resp = curl_exec($chweather);
+        curl_close($chweather);
+        $resp_weather = json_decode($resp, true);
+        //get humidity, temperature, wind, weather, icon_url
+        $humidity = "Humidity is ".$resp_weather['current_observation']['relative_humidity'].". ";
+        $temperature = "Temperature is ".$resp_weather['current_observation']['temperature_string'].". ";
+        $wind = "Wind is ".$resp_weather['current_observation']['wind_string'].". ";
+        $weather = "Weather at ".$hashtag." is ".$resp_weather['current_observation']['weather'];
+        $weather_img_url = $resp_weather['current_observation']['icon_url'];
+        $weather_desc = $temperature.$wind.$humidity;
+
+        //$url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
+
+        //Initiate cURL.
+        $ch = curl_init($url);
+        //The JSON data.
+        $jsonData1 = '{
+            "recipient":{
+                "id":"'."$sender".'"
+            },
+            "message":{
+                "attachment" : {
+                    "type" : "template",
+                    "payload": {
+                        "template_type" : "generic",
+                        "elements" : [
+                            {
+                                "title" : "'."$weather".'",
+                                "image_url" : "'."$weather_img_url".'",
+                                "subtitle" : "'."$weather_desc".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            } 
+                        ]
+                    }
+                }
+            }
+        }';
+
+        //Encode the array into JSON.
+        $jsonDataEncoded = $jsonData1;
+        //Tell cURL that we want to send a POST request.
+        curl_setopt($ch, CURLOPT_POST, 1);
+        //Attach our encoded JSON string to the POST fields.
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+        //Set the content type to application/json
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+        //Execute the request
+        //if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
+            curl_exec($ch);
+            curl_close($ch);
+        //}
+    }
+
+    function getPlaces($message,$url,$sender){
+
+         $hashtag = getHashTags($message);
+
+        $placesquery = urlencode($hashtag);
+        $chplaces = curl_init();
+        curl_setopt_array($chplaces, array(
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_URL => "https://maps.googleapis.com/maps/api/place/textsearch/json?query=".$placesquery."&key=AIzaSyBtsnxKAwolqIfQF8lXw6s_MnWtGbH4DtI"
+            ));
+        $resp = curl_exec($chplaces);
+        curl_close($chplaces);
+        $resp_places = json_decode($resp, true); 
+        $places_length= sizeof($resp_places['results']);
+        for($i = 0; $i < 5; $i++){
+            $place_name[$i] = $resp_places['results'][$i]['name'];
+            $place_address[$i] = $resp_places['results'][$i]['formatted_address'];
+            $place_rating[$i] = $resp_places['results'][$i]['rating'];
+            $place_icon[$i] = $resp_places['results'][$i]['icon'];
+        }
+        //$url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
+
+        //Initiate cURL.
+        $ch = curl_init($url);
+        //The JSON data.
+        $jsonData1 = '{
+            "recipient":{
+                "id":"'."$sender".'"
+            },
+            "message":{
+                "attachment" : {
+                    "type" : "template",
+                    "payload": {
+                        "template_type" : "generic",
+                        "elements" : [
+                        {
+                            "title" : "'."$place_name[0]".'",
+                            "image_url" : "'."$place_icon[0]".'",
+                            "subtitle" : "'."$place_address[0]".'",
+                            "buttons":[
+                            {
+                                "type":"element_share"
+                            }              
+                            ]
+                        },
+                        {
+                            "title" : "'."$place_name[1]".'",
+                            "image_url" : "'."$place_icon[1]".'",
+                            "subtitle" : "'."$place_address[1]".'",
+                            "buttons":[
+                            {
+                                "type":"element_share"
+                            }              
+                            ]
+                        },
+                        {
+                            "title" : "'."$place_name[2]".'",
+                            "image_url" : "'."$place_icon[2]".'",
+                            "subtitle" : "'."$place_address[2]".'",
+                            "buttons":[
+                            {
+                                "type":"element_share"
+                            }              
+                            ]
+                        },
+                        {
+                            "title" : "'."$place_name[3]".'",
+                            "image_url" : "'."$place_icon[3]".'",
+                            "subtitle" : "'."$place_address[3]".'",
+                            "buttons":[
+                            {
+                                "type":"element_share"
+                            }              
+                            ]
+                        },
+                        {
+                            "title" : "'."$place_name[4]".'",
+                            "image_url" : "'."$place_icon[4]".'",
+                            "subtitle" : "'."$place_address[4]".'",
+                            "buttons":[
+                            {
+                                "type":"element_share"
+                            }              
+                            ]
+                        }
+                        ]
+                    }
+                }
+            }
+        }';
+
+        //Encode the array into JSON.
+        $jsonDataEncoded = $jsonData1;
+        //Tell cURL that we want to send a POST request.
+        curl_setopt($ch, CURLOPT_POST, 1);
+        //Attach our encoded JSON string to the POST fields.
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+        //Set the content type to application/json
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+        //Execute the request
+        //if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
+        curl_exec($ch);
+        curl_close($ch);
+        //}
+    }
 
 ?>
