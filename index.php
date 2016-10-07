@@ -31,30 +31,30 @@ $sender = $input['entry'][0]['messaging'][0]['sender']['id'];
 $message = $input['entry'][0]['messaging'][0]['message']['text'];
 
 
-//checkupdatestatus($url);
+checkupdatestatus($url);
 
 
 if($sender != 217358738681243 && isset($message)){
 
     $return_num_replies = checkfirsttime($sender);
 
-	echo $return_num_replies."\n";
+	//echo $return_num_replies."\n";
     if($return_num_replies <=3){
 
         switch ($return_num_replies) {
             case '1':
             firsttime($sender,$url);
-                            $flag = 1;
+            $flag = 1;
 
             break;
             case '2':
             secondtime($sender,$url,$message);
-                            $flag = 1;
+            $flag = 1;
 
             break;
             case '3':
             thirdtime($sender,$url,$message);
-                            $flag = 1;
+            $flag = 1;
 
             break;
         }
@@ -87,70 +87,13 @@ if($sender != 217358738681243 && isset($message)){
     }
     else{
 
-        $apiaiurl = "https://api.api.ai/v1/query?v=20150910";   
-
-        $ch1 = curl_init($apiaiurl);
-	echo "inside API Call\n";
-echo "message= ".$message;
-        $jsonData1 = '{
-            "query":[
-            "'."$message".'"
-            ],
-            "lang": "en",
-            "sessionId": "'."$sender".'"
-        }';
-
-        $jsonDataEncoded1 = $jsonData1;
-        curl_setopt($ch1, CURLOPT_POST, 1);
-        curl_setopt($ch1, CURLOPT_POSTFIELDS, $jsonDataEncoded1);
-        curl_setopt($ch1, CURLOPT_HTTPHEADER, array('Authorization: Bearer 0f4915a28b964721860f3b7c5db16eea', 'Content-Type: application/json' ));
-        curl_setopt($ch1, CURLOPT_RETURNTRANSFER, 1);
-
-        $airesult = curl_exec($ch1);
-	echo "sixe of airesult ".sizeof($airesult);
-        curl_close($ch1);
-
-        $response = json_decode($airesult, true);
-
-	echo "sixe of response ".sizeof($response);
-        if(sizeof($response)){
-            $message_to_reply = $response['result']['fulfillment']['speech'];
-        }
-        else{
-
-            $message_to_reply = "Sorry, I didnt understand that.";
-        }
+echo "inside API Call\n";
+        
+        $message_to_reply = api_ai_call($message,$sender);
 
         save_message_and_response_api($sender,$message,$message_to_reply);
 
-        $url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
-
-//Initiate cURL.
-        $ch = curl_init($url);
-//The JSON data.
-        $jsonData = '{
-            "recipient":{
-                "id":"'."$sender".'"
-            },
-            "message":{
-                "text":"'."$message_to_reply".'"
-            }
-        }';
-
-//Encode the array into JSON.
-        $jsonDataEncoded = $jsonData;
-//Tell cURL that we want to send a POST request.
-        curl_setopt($ch, CURLOPT_POST, 1);
-//Attach our encoded JSON string to the POST fields.
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-//Set the content type to application/json
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-//Execute the request
-        if(!empty($jsonData)){
-            curl_exec($ch);
-            curl_close($ch);
-        }
+        send_simple_message_messenger($sender, $message_to_reply,$url);
     }
 }
 function firsttime($sender,$url){
@@ -158,97 +101,38 @@ function firsttime($sender,$url){
     $db = $GLOBALS['db'];
     $num = 1;
     $sql = "INSERT INTO `clients`(`id`,`replies`) VALUES ('$sender', '$num')";
-    $result = mysqli_query($db,$sql);
+    mysqli_query($db,$sql);
 
     $messages= "Hello User. We welcome you to Chat_bot. Please help us know you better. Please enter Following Details \\n1. Name \\n2. Interests";
-    echo $sender;
-    $temp = $messages;
 
-    $ch = curl_init($url);
-    $jsonData = '{
-        "recipient":{
-            "id":"'."$sender".'"
-        },
-        "message":{
-            "text":"'."$temp".'"
-        }
-    }';
-
-//Encode the array into JSON.
-    $jsonDataEncoded = $jsonData;
-//Tell cURL that we want to send a POST request.
-    curl_setopt($ch, CURLOPT_POST, 1);
-//Attach our encoded JSON string to the POST fields.
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-//Set the content type to application/json
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-//Execute the request
-    if(!empty($jsonData)){
-        curl_exec($ch);
-        curl_close($ch);
-    }
-
+    send_simple_message_messenger($sender, $messages ,$url);
 }
 
 function secondtime($sender,$url,$message){
     $db = $GLOBALS['db'];
     $num = 2;
     $sql = "UPDATE `clients` SET `replies`='$num' WHERE `id` = '$sender'";
-    $result = mysqli_query($db,$sql);
+    mysqli_query($db,$sql);
     $sql1 = "INSERT INTO `user_record`(`id`,`name`) VALUES ('$sender', '$message')";
-    $result1 = mysqli_query($db,$sql1);
+    mysqli_query($db,$sql1);
 
     $send_message = "Please Give your comma separated Interests";
 
-    $ch = curl_init($url);
-    $jsonData = '{
-        "recipient":{
-            "id":"'."$sender".'"
-        },
-        "message":{
-            "text":"'."$send_message".'"
-        }
-    }';
-
-    $jsonDataEncoded = $jsonData;
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-    if(!empty($jsonData)){
-        curl_exec($ch);
-        curl_close($ch);
-    }
+    send_simple_message_messenger($sender,$send_message,$url);
 }
 
 function thirdtime($sender,$url,$message){
     $db = $GLOBALS['db'];
     $num = 3;
     $sql = "UPDATE `clients` SET `replies`='$num' WHERE `id` = '$sender'";
-    $result = mysqli_query($db,$sql);
+    mysqli_query($db,$sql);
     $sql1 = "UPDATE `user_record` SET `interests`= '$message' WHERE `id` = '$sender'";
-    $result1 = mysqli_query($db,$sql1);
+    mysqli_query($db,$sql1);
 
     $send_message = "Thank You for ur Response \\n I can help u with many things like \\n1.News \\n2.Scheduling \\n 3.OCR \\n4. Image/gif search";
 
-    $ch = curl_init($url);
-    $jsonData = '{
-        "recipient":{
-            "id":"'."$sender".'"
-        },
-        "message":{
-            "text":"'."$send_message".'"
-        }
-    }';
+    send_simple_message_messenger($sender,$send_message,$url);
 
-    $jsonDataEncoded = $jsonData;
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-    if(!empty($jsonData)){
-        curl_exec($ch);
-        curl_close($ch);
-    }
 }
 
 function checkfirsttime($sender){
@@ -272,8 +156,6 @@ function checkfirsttime($sender){
             return 4;
             break;
         }
-
-
     }
 }
 
@@ -325,25 +207,8 @@ function add_schedule_db($sender, $message,$url){
 
         }
         else {
-         $ch = curl_init($url);
-         $error_message = "The date is not in correct. Please enter valid future date in correct format";
-         $jsonData = '{
-            "recipient":{
-                "id":"'."$sender".'"
-            },
-            "message":{
-                "text":"'."$error_message".'"
-            }
-        }';
-
-        $jsonDataEncoded = $jsonData;
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-        if(!empty($jsonData)){
-            curl_exec($ch);
-            curl_close($ch);
-        }
+                $error_message = "The date is not in correct. Please enter valid future date in correct format";
+                send_simple_message_messenger($sender,$error_message,$url);
     }
 
 }
@@ -364,37 +229,19 @@ function checkupdatestatus($url){
             $sql = "SELECT `id`, `interests` FROM  `user_record` WHERE `updated` = 'N'";
             $result = mysqli_query($db,$sql);
             $num_query = mysqli_num_rows($result);
-            echo  $num_query;
 
             for($i=0;$i<$num_query;$i++){
 
                 $row=mysqli_fetch_row($result);
-                $ch = curl_init($url);
                 $tmp1 = $row[0];
                 $tmp2 = $row[1];
-                $jsonData = '{
-                    "recipient":{
-                        "id":"'."$tmp1".'"
-                    },
-                    "message":{
-                        "text":"'."$tmp2".'"
-                    }
-                }';
+                send_simple_message_messenger($tmp1,$tmp2,$url);
 
-                $jsonDataEncoded = $jsonData;
-                curl_setopt($ch, CURLOPT_POST, 1);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-                if(!empty($jsonData)){
-                    curl_exec($ch);
-                    curl_close($ch);
-                }
             }
 
             $sql_update_status = "UPDATE `user_record` SET `updated` = 'Y'";
             mysqli_query($db,$sql_update_status);
 
-        echo $date;
             $sql1 = "SELECT `id`, `title` FROM `scheduler` WHERE `date` = '$date' AND `updated` = 'N'";
             $result1 = mysqli_query($db,$sql1);
             $num_query =  mysqli_num_rows($result1);
@@ -402,28 +249,10 @@ function checkupdatestatus($url){
             for($i=0;$i<$num_query;$i++){
 
                 $row=mysqli_fetch_row($result1);
-                $ch = curl_init($url);
-                $tmp1 = $row[0];
+                 $tmp1 = $row[0];
                 $tmp2 = $row[1]." today";
-                $jsonData = '{
-                    "recipient":{
-                        "id":"'."$tmp1".'"
-                    },
-                    "message":{
-                        "text":"'."$tmp2".'"
-                    }
-                }';
-
-                $jsonDataEncoded = $jsonData;
-                curl_setopt($ch, CURLOPT_POST, 1);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-                if(!empty($jsonData)){
-                    curl_exec($ch);
-                    curl_close($ch);
-                }
+                send_simple_message_messenger($tmp1,$tmp2,$url);
             }
-
 
             $sql_update_status1 = "UPDATE `scheduler` SET `updated` = 'Y' WHERE `date` <= '$date'";
             mysqli_query($db,$sql_update_status1);
@@ -431,7 +260,6 @@ function checkupdatestatus($url){
             $date = date("Y-m-d");
             $sql_update_meta_data = "UPDATE `status_table_metadata` SET `updated_on` = '$date' AND `is_updated`= 'Y' WHERE `serial` = '1'";
             mysqli_query($db,$sql_update_meta_data);
-
         }
     }
 }
@@ -481,7 +309,6 @@ function getNews($message,$url,$sender)
             $news_desc[$i] = $resp_news['articles'][$i]['description'];     
         }
         
-        //Initiate cURL.
         $ch = curl_init($url);
         //The JSON data.
         $jsonData1 = '{
@@ -591,8 +418,6 @@ function getWeather($message,$url,$sender){
         $weather_img_url = $resp_weather['current_observation']['icon_url'];
         $weather_desc = $temperature.$wind.$humidity;
 
-        //$url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
-
         //Initiate cURL.
         $ch = curl_init($url);
         //The JSON data.
@@ -638,10 +463,9 @@ function getWeather($message,$url,$sender){
         //}
     }
 
-    function getPlaces($message,$url,$sender){
+function getPlaces($message,$url,$sender){
 
          $hashtag = getHashTags($message);
-
         $placesquery = urlencode($hashtag);
         $chplaces = curl_init();
         curl_setopt_array($chplaces, array(
@@ -658,7 +482,6 @@ function getWeather($message,$url,$sender){
             $place_rating[$i] = $resp_places['results'][$i]['rating'];
             $place_icon[$i] = $resp_places['results'][$i]['icon'];
         }
-        //$url = 'https://graph.facebook.com/v2.6/me/messages?access_token='.$access_token;
 
         //Initiate cURL.
         $ch = curl_init($url);
@@ -744,5 +567,87 @@ function getWeather($message,$url,$sender){
         curl_close($ch);
         //}
     }
+
+function searchNews($message,$url,$sender){
+    //api key   2e7172da1af241579fd822ee581a1535
+
+    $placesquery = urlencode($hashtag);
+        $chplaces = curl_init();
+        curl_setopt_array($chplaces, array(
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_URL => "https://maps.googleapis.com/maps/api/place/textsearch/json?query=".$placesquery."&key=AIzaSyBtsnxKAwolqIfQF8lXw6s_MnWtGbH4DtI"
+            ));
+        $resp = curl_exec($chplaces);
+        curl_close($chplaces);
+        $resp_places = json_decode($resp, true); 
+        //Just make the necessary calls with interest array and custom search query 
+    //api key   2e7172da1af241579fd822ee581a1535
+        //request : https://api.cognitive.microsoft.com/bing/v5.0/news/search?cricket&5&en-IN
+        //Refernce : https://dev.cognitive.microsoft.com/docs/services/56b43f72cf5ff8098cef380a/operations/56b449fbcf5ff81038d15cdf
+        //
+}
+
+function send_simple_message_messenger($sender, $message, $url){
+//Initiate cURL.
+        $ch = curl_init($url);
+//The JSON data.
+        $jsonData = '{
+            "recipient":{
+                "id":"'."$sender".'"
+            },
+            "message":{
+                "text":"'."$message".'"
+            }
+        }';
+
+//Encode the array into JSON.
+        $jsonDataEncoded = $jsonData;
+//Tell cURL that we want to send a POST request.
+        curl_setopt($ch, CURLOPT_POST, 1);
+//Attach our encoded JSON string to the POST fields.
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+//Set the content type to application/json
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+//Execute the request
+        if(!empty($jsonData)){
+            curl_exec($ch);
+            curl_close($ch);
+        }
+}
+
+function api_ai_call($message,$sender){
+            $apiaiurl = "https://api.api.ai/v1/query?v=20150910";   
+
+    $ch1 = curl_init($apiaiurl);
+           
+        $jsonData1 = '{
+            "query":[
+            "'."$message".'"
+            ],
+            "lang": "en",
+            "sessionId": "'."$sender".'"
+        }';
+
+        $jsonDataEncoded1 = $jsonData1;
+        curl_setopt($ch1, CURLOPT_POST, 1);
+        curl_setopt($ch1, CURLOPT_POSTFIELDS, $jsonDataEncoded1);
+        curl_setopt($ch1, CURLOPT_HTTPHEADER, array('Authorization: Bearer 0f4915a28b964721860f3b7c5db16eea', 'Content-Type: application/json' ));
+        curl_setopt($ch1, CURLOPT_RETURNTRANSFER, 1);
+
+        $airesult = curl_exec($ch1);
+        curl_close($ch1);
+
+        $response = json_decode($airesult, true);
+
+        if(sizeof($response)){
+            $message_to_reply = $response['result']['fulfillment']['speech'];
+        }
+        else{
+            $message_to_reply = "Sorry, I didnt understand that.";
+        }
+
+        return $message_to_reply;
+}
 
 ?>
