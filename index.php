@@ -56,6 +56,10 @@ if($sender != 667271826768478 && isset($message)){
                 getNews($message,$url,$sender);
                 $flag = 1;
                break;
+        case 'gifs':
+                getGifs($message,$url,$sender);
+                $flag = 1;
+               break;       
         case 'weather':
                 getWeather($message,$url,$sender);
                 $flag = 1;
@@ -382,8 +386,7 @@ else {
 return false;
 }
 }
-function getNews($message,$url,$sender)
-    {
+function getNews($message,$url,$sender){
         //news api - b663ceb18d2447e59642199521684017
         $hashtag = getHashTags($message);
         $newsquery = urlencode($hashtag);
@@ -401,7 +404,7 @@ function getNews($message,$url,$sender)
         curl_close($chnews);
         $resp_news = json_decode($resp, true);
         $news_length= sizeof($resp_news['value']);
-        echo $news_length;
+        //echo $news_length;
         for($i = 0; $i < $news_length; $i++){
             $news_title[$i] = $resp_news['value'][$i]['name'];
             $news_url[$i] = $resp_news['value'][$i]['url'];
@@ -497,10 +500,114 @@ function getNews($message,$url,$sender)
             curl_close($ch);
         //}
     
+}
+
+function getGifs($message, $url, $sender){
+    $hashtag = getHashTags($message);
+    $gifsquery = urlencode($hashtag);
+    $chgifs = curl_init();
+    curl_setopt_array($chgifs, array(
+        CURLOPT_RETURNTRANSFER => 1,
+        CURLOPT_URL => "http://api.giphy.com/v1/gifs/search?q=".$gifsquery."&api_key=dc6zaTOxFJmzC&limit=5"
+    ));
+    $resp = curl_exec($chgifs);
+    curl_close($chgifs);
+    $resp_gifs = json_decode($resp, true);
+
+    $gifs_length= sizeof($resp_gifs['data']);
+    //echo $news_length;
+    for($i = 0; $i < $gifs_length; $i++){
+        $gif_url[$i] = $resp_gifs['data'][$i]['url'];
+        $gif_play_url[$i] = $resp_gifs['data'][$i]['images']['fixed_height']['url'];    
     }
+
+    //Initiate cURL.
+        $ch = curl_init($url);
+        //The JSON data.
+        $jsonData1 = '{
+            "recipient":{
+                "id":"'."$sender".'"
+            },
+            "message":{
+                "attachment" : {
+                    "type" : "template",
+                    "payload": {
+                        "template_type" : "generic",
+                        "elements" : [
+                            {
+                                "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[0]".'",
+                                "image_url" : "'."$gif_play_url[0]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[1]".'",
+                                "image_url" : "'."$gif_play_url[1]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                               "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[2]".'",
+                                "image_url" : "'."$gif_play_url[2]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[3]".'",
+                                "image_url" : "'."$gif_play_url[3]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[4]".'",
+                                "image_url" : "'."$gif_play_url[4]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }';
+        //Encode the array into JSON.
+        $jsonDataEncoded = $jsonData1;
+        //Tell cURL that we want to send a POST request.
+        curl_setopt($ch, CURLOPT_POST, 1);
+        //Attach our encoded JSON string to the POST fields.
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+        //Set the content type to application/json
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+        //Execute the request
+        //if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
+            curl_exec($ch);
+            curl_close($ch);
+        //}
+}
+
 function getWeather($message,$url,$sender){
         //apikey = a3e33f871698f4ec
-    $hashtag = getHashTags($message);
+        $hashtag = getHashTags($message);
         $chweather = curl_init();
         curl_setopt_array($chweather, array(
             CURLOPT_RETURNTRANSFER => 1,
