@@ -32,7 +32,10 @@ $message = $input['entry'][0]['messaging'][0]['message']['text'];
 
 
 checkupdatestatus($url);
-
+//$date = date("Y-m-d");
+//echo "the date=".$date."end";
+//$sql_update_meta_data = "UPDATE `status_table_metadata` SET `updated_on`='$date',`is_updated`= 'Y' WHERE `serial` = 1";
+//            mysqli_query($db,$sql_update_meta_data);
 
 if($sender != 217358738681243 && isset($message)){
 
@@ -81,6 +84,11 @@ if($sender != 217358738681243 && isset($message)){
                 getWeather($message,$url,$sender);
                 $flag = 1;
                break;
+         case 'gifs':
+                getGifs($message,$url,$sender);
+                $flag = 1;
+               break;       
+
           break;
         }
 
@@ -201,10 +209,11 @@ function add_schedule_db($sender, $message,$url){
         if($date > $date_curr){
             $sql = "INSERT INTO `scheduler`(`id`,`title`,`date`) VALUES ('$sender','$title','$date') ";
             $result = mysqli_query($db,$sql);
-            echo "current date = ".$date_curr;
-            //$sql_update_meta_data1 = "UPDATE `status_table_metadata` SET `updated_on` = '".date("Y-m-d")."' AND `is_updated`= 'N' WHERE `serial`= '1'";
-            //echo mysqli_query($db,$sql_update_meta_data1);
-
+            echo "result = ".$result;
+            if($result){
+                $success_message = "Added the task and will notify you on that day"
+                send_simple_message_messenger($sender, $success_message,$url);
+            }
         }
         else {
                 $error_message = "The date is not in correct. Please enter valid future date in correct format";
@@ -222,21 +231,22 @@ function checkupdatestatus($url){
     echo mysqli_num_rows($result_meta_data);
     $row_meta_data = mysqli_fetch_row($result_meta_data); 
     if(!(($row_meta_data[0] == $date) && ($row_meta_data[1] == "Y"))){
-        $time = 12;
+        $time = date("H");
 
-        if($time >= 9){
+        if($time >= 0){
 
-            $sql = "SELECT `id`, `interests` FROM  `user_record` WHERE `updated` = 'N'";
+            $sql = "SELECT `id`, `interests` FROM  `user_record`";
             $result = mysqli_query($db,$sql);
             $num_query = mysqli_num_rows($result);
 
             for($i=0;$i<$num_query;$i++){
 
                 $row=mysqli_fetch_row($result);
-                $tmp1 = $row[0];
+                $sender = $row[0];
                 $tmp2 = $row[1];
-                send_simple_message_messenger($tmp1,$tmp2,$url);
-
+                $interestArray = getInterestArray($tmp2);
+                getNewsInterests($interestArray,$url,$sender){
+                };
             }
 
             $sql_update_status = "UPDATE `user_record` SET `updated` = 'Y'";
@@ -258,7 +268,7 @@ function checkupdatestatus($url){
             mysqli_query($db,$sql_update_status1);
 
             $date = date("Y-m-d");
-            $sql_update_meta_data = "UPDATE `status_table_metadata` SET `updated_on` = '$date' AND `is_updated`= 'Y' WHERE `serial` = '1'";
+            $sql_update_meta_data = "UPDATE `status_table_metadata` SET `updated_on`='$date',`is_updated`= 'Y' WHERE `serial` = 1";
             mysqli_query($db,$sql_update_meta_data);
         }
     }
@@ -288,30 +298,34 @@ else {
 return false;
 }
 }
-function getNews($message,$url,$sender)
+function getNews($message,$url,$sender,$var_call)
     {
-        //news api - a3f365280e404a49b0595f6c1d8cec05
+        //news api - b663ceb18d2447e59642199521684017
         $hashtag = getHashTags($message);
+        $newsquery = urlencode($hashtag);
+        echo $newsquery;
         $chnews = curl_init();
         curl_setopt_array($chnews, array(
             CURLOPT_RETURNTRANSFER => 1,
-            CURLOPT_URL => "https://newsapi.org/v1/articles?source=".$hashtag."&apiKey=a3f365280e404a49b0595f6c1d8cec05"
+            CURLOPT_URL => "https://api.cognitive.microsoft.com/bing/v5.0/news/search?q=".$newsquery."&count=5",
+        ));
+        curl_setopt($chnews, CURLOPT_HTTPHEADER, array(
+            'Ocp-Apim-Subscription-Key: b663ceb18d2447e59642199521684017'
         ));
         $resp = curl_exec($chnews);
+        echo $resp;
         curl_close($chnews);
         $resp_news = json_decode($resp, true);
-        $news_length= sizeof($resp_news['articles']);
-        $array_of_news = [];
+        $news_length= sizeof($resp_news['value']);
+        echo $news_length;
         for($i = 0; $i < $news_length; $i++){
-            $news_title[$i] = $resp_news['articles'][$i]['title'];
-            $news_url[$i] = $resp_news['articles'][$i]['url'];
-            $news_image_url[$i] = $resp_news['articles'][$i]['urlToImage'];
-            $news_desc[$i] = $resp_news['articles'][$i]['description'];     
+            $news_title[$i] = $resp_news['value'][$i]['name'];
+            $news_url[$i] = $resp_news['value'][$i]['url'];
+            $news_image_url[$i] = $resp_news['value'][$i]['image']['thumbnail']['contentUrl'];
+            $news_desc[$i] = $resp_news['value'][$i]['description'];     
         }
-        
-        $ch = curl_init($url);
-        //The JSON data.
-        $jsonData1 = '{
+
+        $jsonData = '{
             "recipient":{
                 "id":"'."$sender".'"
             },
@@ -381,22 +395,7 @@ function getNews($message,$url,$sender)
                 }
             }
         }';
-
-        //Encode the array into JSON.
-        $jsonDataEncoded = $jsonData1;
-        //Tell cURL that we want to send a POST request.
-        curl_setopt($ch, CURLOPT_POST, 1);
-        //Attach our encoded JSON string to the POST fields.
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-        //Set the content type to application/json
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-        //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-        //Execute the request
-        //if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
-            curl_exec($ch);
-            curl_close($ch);
-        //}
-    
+        sendmessage($url,$jsonData);  
     }
 
 function getWeather($message,$url,$sender){
@@ -418,10 +417,7 @@ function getWeather($message,$url,$sender){
         $weather_img_url = $resp_weather['current_observation']['icon_url'];
         $weather_desc = $temperature.$wind.$humidity;
 
-        //Initiate cURL.
-        $ch = curl_init($url);
-        //The JSON data.
-        $jsonData1 = '{
+        $jsonData = '{
             "recipient":{
                 "id":"'."$sender".'"
             },
@@ -446,21 +442,7 @@ function getWeather($message,$url,$sender){
                 }
             }
         }';
-
-        //Encode the array into JSON.
-        $jsonDataEncoded = $jsonData1;
-        //Tell cURL that we want to send a POST request.
-        curl_setopt($ch, CURLOPT_POST, 1);
-        //Attach our encoded JSON string to the POST fields.
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-        //Set the content type to application/json
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-        //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-        //Execute the request
-        //if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
-            curl_exec($ch);
-            curl_close($ch);
-        //}
+     sendmessage($url,$jsonData);
     }
 
 function getPlaces($message,$url,$sender){
@@ -483,10 +465,7 @@ function getPlaces($message,$url,$sender){
             $place_icon[$i] = $resp_places['results'][$i]['icon'];
         }
 
-        //Initiate cURL.
-        $ch = curl_init($url);
-        //The JSON data.
-        $jsonData1 = '{
+        $jsonData = '{
             "recipient":{
                 "id":"'."$sender".'"
             },
@@ -552,45 +531,100 @@ function getPlaces($message,$url,$sender){
             }
         }';
 
-        //Encode the array into JSON.
-        $jsonDataEncoded = $jsonData1;
-        //Tell cURL that we want to send a POST request.
-        curl_setopt($ch, CURLOPT_POST, 1);
-        //Attach our encoded JSON string to the POST fields.
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-        //Set the content type to application/json
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-        //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-        //Execute the request
-        //if(!empty($input['entry'][0]['messaging'][0]['message']['text'])){
-        curl_exec($ch);
-        curl_close($ch);
-        //}
+        sendmessage($url,$jsonData);
     }
 
-function searchNews($message,$url,$sender){
-    //api key   2e7172da1af241579fd822ee581a1535
+function getGifs($message, $url, $sender){
+    $hashtag = getHashTags($message);
+    $gifsquery = urlencode($hashtag);
+    $chgifs = curl_init();
+    curl_setopt_array($chgifs, array(
+        CURLOPT_RETURNTRANSFER => 1,
+        CURLOPT_URL => "http://api.giphy.com/v1/gifs/search?q=".$gifsquery."&api_key=dc6zaTOxFJmzC&limit=5"
+    ));
+    $resp = curl_exec($chgifs);
+    curl_close($chgifs);
+    $resp_gifs = json_decode($resp, true);
+    $gifs_length= sizeof($resp_gifs['data']);
+    //echo $news_length;
+    for($i = 0; $i < $gifs_length; $i++){
+        $gif_url[$i] = $resp_gifs['data'][$i]['url'];
+        $gif_play_url[$i] = $resp_gifs['data'][$i]['images']['fixed_height']['url'];    
+    }
 
-    $placesquery = urlencode($hashtag);
-        $chplaces = curl_init();
-        curl_setopt_array($chplaces, array(
-            CURLOPT_RETURNTRANSFER => 1,
-            CURLOPT_URL => "https://maps.googleapis.com/maps/api/place/textsearch/json?query=".$placesquery."&key=AIzaSyBtsnxKAwolqIfQF8lXw6s_MnWtGbH4DtI"
-            ));
-        $resp = curl_exec($chplaces);
-        curl_close($chplaces);
-        $resp_places = json_decode($resp, true); 
-        //Just make the necessary calls with interest array and custom search query 
-    //api key   2e7172da1af241579fd822ee581a1535
-        //request : https://api.cognitive.microsoft.com/bing/v5.0/news/search?cricket&5&en-IN
-        //Refernce : https://dev.cognitive.microsoft.com/docs/services/56b43f72cf5ff8098cef380a/operations/56b449fbcf5ff81038d15cdf
-        //
+        $jsonData = '{
+            "recipient":{
+                "id":"'."$sender".'"
+            },
+            "message":{
+                "attachment" : {
+                    "type" : "template",
+                    "payload": {
+                        "template_type" : "generic",
+                        "elements" : [
+                            {
+                                "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[0]".'",
+                                "image_url" : "'."$gif_play_url[0]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[1]".'",
+                                "image_url" : "'."$gif_play_url[1]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                               "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[2]".'",
+                                "image_url" : "'."$gif_play_url[2]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[3]".'",
+                                "image_url" : "'."$gif_play_url[3]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$hashtag".'",
+                                "item_url" : "'."$gif_url[4]".'",
+                                "image_url" : "'."$gif_play_url[4]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }';
+
+        sendmessage($url,$jsonData);
+
 }
 
+
 function send_simple_message_messenger($sender, $message, $url){
-//Initiate cURL.
-        $ch = curl_init($url);
-//The JSON data.
+
         $jsonData = '{
             "recipient":{
                 "id":"'."$sender".'"
@@ -600,20 +634,8 @@ function send_simple_message_messenger($sender, $message, $url){
             }
         }';
 
-//Encode the array into JSON.
-        $jsonDataEncoded = $jsonData;
-//Tell cURL that we want to send a POST request.
-        curl_setopt($ch, CURLOPT_POST, 1);
-//Attach our encoded JSON string to the POST fields.
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
-//Set the content type to application/json
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-//curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
-//Execute the request
-        if(!empty($jsonData)){
-            curl_exec($ch);
-            curl_close($ch);
-        }
+        sendmessage($url,$jsonData);
+
 }
 
 function api_ai_call($message,$sender){
@@ -647,7 +669,148 @@ function api_ai_call($message,$sender){
             $message_to_reply = "Sorry, I didnt understand that.";
         }
 
+
         return $message_to_reply;
 }
 
+function sendmessage($url,$jsonData){
+
+ //Initiate cURL.
+        $ch = curl_init($url);
+        //The JSON data.
+ //Encode the array into JSON.
+        $jsonDataEncoded = $jsonData;
+        //Tell cURL that we want to send a POST request.
+        curl_setopt($ch, CURLOPT_POST, 1);
+        //Attach our encoded JSON string to the POST fields.
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+        //Set the content type to application/json
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        //curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+        //Execute the request
+        if(!empty($jsonData)){
+        curl_exec($ch);
+        curl_close($ch);
+        //}
+}
+}
+
+    getInterestArray($tmp2){
+            preg_match_all ("\,[a-zA-Z]*\,|^[a-zA-Z]*\,|[a-zA-Z]*\,|[a-zA-Z]*$", $string, $tagarray);
+            return $tagarray;
+    }
+
+function getNewsInterests($interestArray,$url,$sender){
+        $arrayResponses = array();
+        $j=0;
+        while(isset($interestArray[$j])){
+    
+         $hashtag = str_replace(",","",$interestArray[$j])
+        $newsquery = urlencode($hashtag);
+        echo $newsquery;
+        $chnews = curl_init();
+        curl_setopt_array($chnews, array(
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_URL => "https://api.cognitive.microsoft.com/bing/v5.0/news/search?q=".$newsquery."&count=1",
+        ));
+        curl_setopt($chnews, CURLOPT_HTTPHEADER, array(
+            'Ocp-Apim-Subscription-Key: b663ceb18d2447e59642199521684017'
+        ));
+        $resp = curl_exec($chnews);
+        array_push($arrayResponses, $resp);
+        curl_close($chnews);
+        $j++;
+
+    }
+//$arrayResponses is array of all the responses from news api. I have called api once for each interest. i have asked 
+//for only 1 response for each interest. below code is just copy paste of original one. Just chenge the below code and make the json object
+//get the value in $resp_news with     
+
+//           $resp_news = json_decode($arrayResponses[$i], true);       
+//Add for loop and access all values, make json and function sendmessage($url,$jsonData) is to send json.
+//    
+
+    $resp_news = json_decode($resp, true);
+        $news_length= sizeof($resp_news['value']);
+        echo $news_length;
+        for($i = 0; $i < $news_length; $i++){
+            $news_title[$i] = $resp_news['value'][$i]['name'];
+            $news_url[$i] = $resp_news['value'][$i]['url'];
+            $news_image_url[$i] = $resp_news['value'][$i]['image']['thumbnail']['contentUrl'];
+            $news_desc[$i] = $resp_news['value'][$i]['description'];     
+        }
+
+        $jsonData = '{
+            "recipient":{
+                "id":"'."$sender".'"
+            },
+            "message":{
+                "attachment" : {
+                    "type" : "template",
+                    "payload": {
+                        "template_type" : "generic",
+                        "elements" : [
+                            {
+                                "title" : "'."$news_title[0]".'",
+                                "item_url" : "'."$news_url[0]".'",
+                                "image_url" : "'."$news_image_url[0]".'",
+                                "subtitle" : "'."$news_desc[0]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$news_title[1]".'",
+                                "item_url" : "'."$news_url[1]".'",
+                                "image_url" : "'."$news_image_url[1]".'",
+                                "subtitle" : "'."$news_desc[1]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$news_title[2]".'",
+                                "item_url" : "'."$news_url[2]".'",
+                                "image_url" : "'."$news_image_url[2]".'",
+                                "subtitle" : "'."$news_desc[2]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$news_title[3]".'",
+                                "item_url" : "'."$news_url[3]".'",
+                                "image_url" : "'."$news_image_url[3]".'",
+                                "subtitle" : "'."$news_desc[3]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            },
+                            {
+                                "title" : "'."$news_title[4]".'",
+                                "item_url" : "'."$news_url[4]".'",
+                                "image_url" : "'."$news_image_url[4]".'",
+                                "subtitle" : "'."$news_desc[4]".'",
+                                "buttons":[
+                                  {
+                                    "type":"element_share"
+                                  }              
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }';
+        sendmessage($url,$jsonData);  
+   
+    }
 ?>
